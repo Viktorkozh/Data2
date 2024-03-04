@@ -4,9 +4,9 @@
 import json
 import sys
 from datetime import datetime
+import jsonschema
 
 
-# Ниже определим схему JSON для валидации данных человека.
 person_schema = {
     "type": "object",
     "properties": {
@@ -108,13 +108,13 @@ def show_help():
           )
     print("help - отобразить справку;")
     print("load - загрузить данные из файла;")
-    print("save сохранить данные в файл;")
+    print("save - сохранить данные в файл;")
     print("exit - завершить работу с программой.")
 
 
-def save_workers(file_name, staff):
+def save_people(file_name, staff):
     """
-    Сохранить всех работников в файл JSON.
+    Сохранить всех людей в файл JSON.
     """
     staff_formatted = [{**person, 'date_of_birth': person.get(
         'date_of_birth').strftime('%d.%m.%Y')} for person in staff]
@@ -124,17 +124,36 @@ def save_workers(file_name, staff):
         json.dump(staff_formatted, fout, ensure_ascii=False, indent=4)
 
 
-def load_workers(file_name):
+def load_people(file_name):
     """
-    Загрузить всех работников из файла JSON.
+    Загрузить всех людей из файла JSON.
     """
     # Открыть файл с заданным именем для чтения.
     with open(file_name, "r", encoding="utf-8") as fin:
         staff_loaded = json.load(fin)
+        result_people = []
+        cnt = 0
         for person in staff_loaded:
-            person['date_of_birth'] = datetime.strptime(
-                person['date_of_birth'], '%d.%m.%Y')
-        return staff_loaded
+            cnt += 1
+            if validate_person(person, person_schema):
+                try:
+                    person['date_of_birth'] = datetime.strptime(
+                        person['date_of_birth'], '%d.%m.%Y')
+                    result_people.append(person)
+                except:
+                    print(f"Ошибка при разборе даты в записи, пропуск записи {cnt}.")
+            else:
+                print("Неверные данные человека, пропуск записи.")
+        return result_people
+
+
+def validate_person(person_data, schema):
+    try:
+        jsonschema.validate(person_data, schema)
+        return True
+    except jsonschema.exceptions.ValidationError as e:
+        print(f"Данные человека не соответствуют схеме: {e}")
+        return False
 
 
 def main():
@@ -166,7 +185,7 @@ def main():
             file_name = parts[1] + ".json"
 
             # сохранить данные в файл с заданным именем.
-            save_workers(file_name, people)
+            save_people(file_name, people)
 
         elif command.startswith("load "):
             # Разбить команду на части для выделения имени файла.
@@ -175,7 +194,7 @@ def main():
             file_name = parts[1] + ".json"
 
             # сохранить данные в файл с заданным именем.
-            people = load_workers(file_name)
+            people = load_people(file_name)
 
         else:
             print(f"Неизвестная команда {command}", file=sys.stderr)
